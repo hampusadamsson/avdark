@@ -38,7 +38,7 @@ typedef struct {
 } thread_info_t;
 
 /** Define to enable debug mode */
-#define DEBUG 0 /* 1 */
+#define DEBUG 1 /* 1 */
 
 /** Debug output macro. Only active when DEBUG is non-0 */
 #define dprintf(...)                            \
@@ -104,7 +104,7 @@ thread_sweep(int tid, int iter, int lbound, int rbound)
 
                 /* TASK: Wait for data to be available from the thread
                  * to the left */
-                while(tid!=0 && threads[tid-1].curRow <= row){
+                while(tid!=0 && threads[tid-1].curRow < row){
                 }
 
                 dprintf("%d: Starting on row: %d\n", tid, row);
@@ -125,7 +125,7 @@ thread_sweep(int tid, int iter, int lbound, int rbound)
                  * is done */
                 //threads[tid].curRow++; //atomic TODO
                 threads[tid].curRow = row;
-
+                
                 dprintf("%d: row %d done\n", tid, row);
         }
         threads[tid].curRow++;
@@ -162,10 +162,11 @@ thread_compute(void *_self)
                  * errors */
                 /* Hint: Which thread is guaranteed to complete its
                  * sweep last? */
+                pthread_barrier_wait(&barrier);
 
-                if(gs_nthreads == tid)
+                if(gs_nthreads-1 == tid)
                         for(int i=0; i<=gs_nthreads; i++)
-                                global_error+=threads[i].error;
+                                global_error-=threads[i].error;
 
                 dprintf("%d: iteration %d done\n", tid, iter);
                 /* TASK: Iteration barrier */

@@ -145,8 +145,6 @@ thread_compute(void *_self)
         /* TASK: Compute bounds for this thread */
         lbound = tid * (gs_size/gs_nthreads);
         rbound = (tid+1) * (gs_size/gs_nthreads)-1; // Deduct one to avoid overlap of columns.
-        if(gs_nthreads == tid)                      // Last thread gets one more.
-
 
         gs_verbose_printf("%i: lbound: %i, rbound: %i\n",
                           tid, lbound, rbound);

@@ -29,16 +29,15 @@ typedef struct {
         int thread_id;
         pthread_t thread;
         volatile double error;
-        // LEFT PTHREAD addr
-        // RIGHT PTHREAD addr
-        // state
-        volatile int curRow;
-
         /* TASK: Do you need any thread local state for synchronization? */
+        volatile int curRow;
+        int padd_data1[8];
 } thread_info_t;
 
+
+
 /** Define to enable debug mode */
-#define DEBUG 1 /* 1 */
+#define DEBUG 0 /* 1 */
 
 /** Debug output macro. Only active when DEBUG is non-0 */
 #define dprintf(...)                            \
@@ -72,8 +71,8 @@ gsi_init()
         /* TASK: Initialize global variables here */
         pthread_barrier_init(&barrier, NULL, gs_nthreads);
 
-        /*for(int i=0; i<4; i++)
-          threads[i].curRow=0;*/ // Varför?
+        for(int i=0; i<4; i++)
+                threads[i].curRow=0;
 }
 
 void
@@ -95,17 +94,11 @@ thread_sweep(int tid, int iter, int lbound, int rbound)
         threads[tid].error = 0.0;
 
         for (int row = 1; row < gs_size - 1; row++) {
-                dprintf("%d: checking wait condition "
-                        "iteration: %i, row: %i\n",
-                        tid,
-                        iter, row);
-
-                dprintf("%d: : %d\n", tid, threads[tid].curRow);
+                dprintf("%d: checking wait condition iteration: %i, row: %i\n", tid, iter, row);
 
                 /* TASK: Wait for data to be available from the thread
                  * to the left */
-                while(tid!=0 && threads[tid-1].curRow < row){
-                }
+                while(tid!=0 && threads[tid-1].curRow <= threads[tid].curRow){}
 
                 dprintf("%d: Starting on row: %d\n", tid, row);
 
@@ -123,9 +116,9 @@ thread_sweep(int tid, int iter, int lbound, int rbound)
 
                 /* TASK: Tell the thread to the right that this thread
                  * is done */
-                //threads[tid].curRow++; //atomic TODO
-                threads[tid].curRow = row;
-                
+
+                threads[tid].curRow++;
+
                 dprintf("%d: row %d done\n", tid, row);
         }
         threads[tid].curRow++;
@@ -144,8 +137,12 @@ thread_compute(void *_self)
 
         /* TASK: Compute bounds for this thread */
         lbound = tid * (gs_size/gs_nthreads);
-        rbound = (tid+1) * (gs_size/gs_nthreads)-1; // Deduct one to avoid overlap of columns.
-
+        rbound = (tid+1) * (gs_size/gs_nthreads); // Deduct one to avoid overlap of columns.
+        if(tid == 0)
+               lbound++;
+        if(tid == gs_nthreads-1)
+                rbound--;
+        printf("Left: %d, Right: %d \n", lbound, rbound);
         gs_verbose_printf("%i: lbound: %i, rbound: %i\n",
                           tid, lbound, rbound);
 
@@ -162,11 +159,12 @@ thread_compute(void *_self)
                  * errors */
                 /* Hint: Which thread is guaranteed to complete its
                  * sweep last? */
-                pthread_barrier_wait(&barrier);
 
-                if(gs_nthreads-1 == tid)
+                if(gs_nthreads-1 == tid){
+                        global_error = 0.0;
                         for(int i=0; i<=gs_nthreads; i++)
-                                global_error-=threads[i].error;
+                                global_error+=threads[i].error;
+                }
 
                 dprintf("%d: iteration %d done\n", tid, iter);
                 /* TASK: Iteration barrier */
@@ -226,6 +224,8 @@ gsi_calculate()
                 printf("Note: This is normal if you are using the "
                        "default settings.\n");
         }
+        printf("Final global error: %f\n", global_error);
+        printf("Size of pthread_t: %ld\n", sizeof(thread_info_t));
 }
 
 /*
